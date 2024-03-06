@@ -122,3 +122,8 @@ for script in "$dotfiles/completion/"*.bash ; do
 done
 
 . $dotfiles/.aliases
+
+# Bindings
+bindkey "^R" history-incremental-search-backward
+bindkey "\e[A" history-beginning-search-backward
+bindkey "\e[B" history-beginning-search-forward
