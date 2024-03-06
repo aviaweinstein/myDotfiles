@@ -1,4 +1,5 @@
-alias ll="ls $ls_options"
+# alias ll="ls $ls_options"
+alias ll='ls -A'
 alias l=ll
 alias f='find . -name'
 
@@ -26,38 +27,7 @@ alias ghist='for branch in `git branch -r | grep -v HEAD`;do echo -e `git show -
 alias gcd='cd "$(git rev-parse --show-toplevel)"'
 alias gitc='bug=`git symbolic-ref HEAD|sed s#refs/heads/##`; issue_type=$(echo $bug | cut -f1 -d- | tr a-z A-Z); issue_number=$(echo $bug | cut -f2 -d-); git commit -em "$issue_type-$issue_number: "'
 
-# Bundler
-alias be='bundle exec'
-
-# Rspec
-alias respect='bundle exec rspec'
-alias ber='bundle exec rspec'
-alias wipit='be rspec -t @wip'
-
-# Run the specs and push if successful
-alias rpush='rspec --fail-fast && git push'
-
-# Rails
-alias r='bundle exec rails s'
-alias rspec='rspec -c'
-alias migrate='bundle exec rake db:migrate && bundle exec rake test:prepare'
-
-# Pow
-alias rpow='touch tmp/restart.txt'
-alias vlm='vim db/migrate/`ls db/migrate | tail -1`'
-
 # Apps
 alias v='mvim'
 alias vi='vim'
 alias vim='vim'
-
-# Not really useful anymore
-alias lunch="open /Volumes/4moms/Company\ Related/LUNCH\ MENUS/"
-
-# Ceedling
-alias rr="rake release"
-alias rta="rake test:all"
-alias db="rr; arm-none-eabi-gdb"
-
-# Random
-alias todo="git grep -EI 'TODO' > ~/sentinel-todo.txt"

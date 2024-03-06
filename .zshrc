@@ -1,50 +1,124 @@
-test -s ~/.alias && . ~/.alias || true
-dict() { curl dict://dict.org/d:$1; }
-sdict() { curl dict://dict.org/m:$1; }
-wp() { elinks -dump -no-numbering http://en.wikipedia.org/wiki/$1 | less; }
-kk() { kill -9 `ps -ef | grep $1 | awk '{print $2}'`; }
+setopt NO_CASE_GLOB
+setopt AUTO_CD
+# setopt CORRECT
+# setopt CORRECT_ALL
+HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+# share history across multiple zsh sessions
+setopt SHARE_HISTORY
+# append to history
+setopt APPEND_HISTORY
+# adds commands as they are typed, not at shell exit
+setopt INC_APPEND_HISTORY
+# expire duplicates first
+setopt HIST_EXPIRE_DUPS_FIRST 
+# do not store duplications
+setopt HIST_IGNORE_DUPS
+#ignore duplicates when searching
+setopt HIST_FIND_NO_DUPS
+# removes blank lines from history
+setopt HIST_REDUCE_BLANKS
+# shows the substituted command in the prompt when using !! for prev command
+setopt HIST_VERIFY
+# prompt string is first subjected to parameter expansion, command substitution and arithmetic expansion
+setopt PROMPT_SUBST
 
-function urlopen()
-{ 
-	open "http://$*" 
+# initializes the zsh completion system http://zsh.sourceforge.net/Doc/Release/Completion-System.html#Completion-System
+autoload -Uz compinit && compinit
+# case insensitive path-completion
+zstyle ':completion:*' matcher-list 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'm:{[:lower:][:upper:]}={[:upper:][:lower:]} l:|=* r:|=*' 'm:{[:lower:][:upper:]}={[:upper:][:lower:]} l:|=* r:|=*' 'm:{[:lower:][:upper:]}={[:upper:][:lower:]} l:|=* r:|=*'
+# partial completion suggestions
+zstyle ':completion:*' list-suffixeszstyle ':completion:*' expand prefix suffix
+# load bashcompinit for some old bash completions
+autoload bashcompinit && bashcompinit
+[[ -r ~/Projects/autopkg_complete/autopkg ]] && source ~/Projects/autopkg_complete/autopkg
+
+parse_git_branch() {
+  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/'
 }
-alias -s com=urlopen
 
-alias x=' history -c && rm -f ~/.zsh_history'
+p() {
+  autoload colors ; colors
+  # local cur_cmd="${blue_op}%_${blue_cp}"
+  # PROMPT2="${cur_cmd}> "
 
-function firefox() { command firefox "$@" & }
+  local time_op="%F{yellow}"
+  local whoami_op="%F{green}"
+  local branch_op="%F{#005fff}"
+  local dir_op="%F{cyan}"
+  local end="%f"
 
-function extract()      # Handy Extract Program.
-{
-       if [ -f $1 ] ; then
-         case $1 in
-         *.tar.bz2)   tar xvjf $1     ;;
-         *.tar.gz)    tar xvzf $1     ;;
-         *.bz2)       bunzip2 $1      ;;
-         *.rar)       unrar x $1      ;;
-         *.gz)        gunzip $1       ;;
-         *.tar)       tar xvf $1      ;;
-         *.tbz2)      tar xvjf $1     ;;
-         *.tgz)       tar xvzf $1     ;;
-         *.zip)       unzip $1        ;;
-         *.Z)         uncompress $1   ;;
-         *.7z)        7z x $1         ;;
-         *)           echo "'$1' cannot be extracted via >extract<" ;;
-       esac
-       else
-         echo "'$1' is not a valid file"
-       fi
+  local time="${time_op}%D{%a %b %f %L:%M %p}${end}"
+  local whoami="${whoami_op}%n@%m${end}"
+  local dir="${dir_op}%~${end}"
+  local parsed_git_branch=$(parse_git_branch)
+  local branch
+  if test $parsed_git_branch ; then
+    branch=" ${branch_op}$(parse_git_branch)${end}"
+  else
+    unset branch
+  fi
+
+  local last_status=$?
+  local last_fail
+  if test $last_status -ne 0 ; then
+    last_fail="=> %F{yellow}Err: $last_status${end}\n"
+  else
+    unset last_fail
+  fi
+
+  echo "$time $whoami$branch $dir
+$last_fail${end}\$ "
 }
 
-autoload colors ; colors
-local blue_op="%{$fg[yellow]%}[%{$reset_color%}"
-local blue_cp="%{$fg[yellow]%}]%{$reset_color%}"
-local path_p="${blue_op}%~${blue_cp}"
-local user_host="${blue_op}%n@%m${blue_cp}"
-local ret_status="${blue_op}%?${blue_cp}"
-local hist_no="${blue_op}%h${blue_cp}"
-local smiley="%(?,%{$fg[green]%}(=%{$reset_color%},%{$fg[red]%}X(%{$reset_color%})"
-PROMPT="╭─${path_p}─${user_host}─${blue_op}%D{%H:%M} %D{%a %b %d}${blue_cp}─${ret_status}─${hist_no}
-╰─${blue_op}%B%F${smiley}%b%f${blue_cp} %# "
-local cur_cmd="${blue_op}%_${blue_cp}"
-PROMPT2="${cur_cmd}> "
+PROMPT='$(p)'
+# retain $PROMPT_DIRTRIM directory components when the prompt is too long
+PROMPT_DIRTRIM=3
+
+## Set up $dotfiles directory
+# returns true if the program is installed
+installed() {
+  hash "$1" >/dev/null 2>&1
+}
+
+# OSX `readlink` doesn't support the `-f` option (-f = follow components to make full path)
+# If `greadlink` is installed, use it
+# Otherwise, use the dir and basename provided to construct a sufficient stand-in
+relative_readlink() {
+  local dir="$1" base="$2"
+  if installed greadlink ; then
+    dirname "$(greadlink -f "$dir/$base")"
+  elif pushd "$dir" >/dev/null 2>&1 ; then
+    local link="$(readlink "$base")"
+    case "$link" in
+      /*) dirname "$link" ;;
+      *) pushd "$(dirname "$link")" >/dev/null 2>&1 ; pwd -P ; popd >/dev/null ;;
+    esac
+    popd >/dev/null
+  fi
+}
+
+if [[ -L "$HOME/.bash_profile" ]] ; then
+  dotfiles="$(relative_readlink "$HOME" .bash_profile)"
+fi
+
+if [[ -z "$dotfiles" ]] || [[ ! -d "$dotfiles" ]] ; then
+  #warn "~/.bash_profile should be a link to .bash_profile in the dotfiles repo"
+  dotfiles=$HOME/Code/dotfiles
+fi
+
+# Finish if we couldn't find our root directory
+if [[ -z "$dotfiles" ]] || [[ ! -d "$dotfiles" ]] ; then
+  echo "Couldn't find root of dotfiles directory. Exiting .bash_profile early."
+  return
+fi
+
+export DOTFILES="$dotfiles"
+
+. $dotfiles/app-navigation.bash
+
+# Load completion files from $dotfiles/completion/{function}.bash
+for script in "$dotfiles/completion/"*.bash ; do
+  . "$script" > /dev/null 2>&1
+done
+
+. $dotfiles/.aliases
